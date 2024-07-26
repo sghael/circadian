@@ -41,6 +41,6 @@ regex = "1.7.1"
 glob = "0.3.1"
 rust-ini = "0.18.0"
 clap = { version = "4.1.10", features = ["derive"] }
-time = { version = "0.3.20", features = ["macros", "parsing", "local-offset"] }
+time = { version = "0.3.35", features = ["macros", "parsing", "local-offset"] }
 nix = "0.26.2"
 users = "0.11.0"
