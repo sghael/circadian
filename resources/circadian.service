@@ -4,7 +4,7 @@ Description=Circadian power management service
 [Service]
 Type=simple
 User=root
-ExecStart=/usr/bin/circadian
+ExecStart=/usr/local/bin/circadian
 Restart=on-failure
 
 [Install]
