@@ -306,41 +306,6 @@ fn command_exists(cmd: &str) -> bool {
         }
 }
 
-/// Parse idle time strings from 'w' command into seconds
-fn parse_w_time(time_str: &str) -> Result<u32, CircadianError> {
-    let mut secs: u32 = 0;
-    let mut mins: u32 = 0;
-    let mut hours:u32 = 0;
-    let re_sec = Regex::new(r"^\d+.\d+s$")?;
-    let re_min = Regex::new(r"^\d+:\d+$")?;
-    let re_hour = Regex::new(r"^\d+:\d+m$")?;
-    if re_sec.is_match(time_str) {
-        let time_str: &str = time_str.trim_matches('s');
-        let parts: Vec<u32> = time_str.split(".")
-            .map(|s| str::parse::<u32>(s).unwrap_or(0))
-            .collect();
-        secs = *parts.get(0).unwrap_or(&0);
-    }
-    else if re_min.is_match(time_str) {
-        let parts: Vec<u32> = time_str.split(":")
-            .map(|s| str::parse::<u32>(s).unwrap_or(0))
-            .collect();
-        mins = *parts.get(0).unwrap_or(&0);
-        secs = *parts.get(1).unwrap_or(&0);
-    }
-    else if re_hour.is_match(time_str) {
-        let time_str: &str = time_str.trim_matches('m');
-        let parts: Vec<u32> = time_str.split(":")
-            .map(|s| str::parse::<u32>(s).unwrap_or(0))
-            .collect();
-        hours = *parts.get(0).unwrap_or(&0);
-        mins = *parts.get(1).unwrap_or(&0);
-    }
-    else {
-        return Err(CircadianError("Invalid idle format".to_string()));
-    }
-    Ok((hours*60*60) + (mins*60) + secs)
-}
 
 
 
