@@ -507,7 +507,7 @@ fn idle_display(cmd: &str, args: Vec<&str>) -> IdleResult {
                         }
                     },
                     Err(e) => {
-                        eprintln!("WARNING: {} failed for socket {} with error: {}", cmd, device, e);
+                        eprintln!("ERROR: {} failed for socket {} with error: {}", cmd, device, e);
                     },
                 }
         }
@@ -803,8 +803,6 @@ fn test_idle(config: &CircadianConfig, start: i64) -> IdleResponse {
     let idle_remain: u64 =
             std::cmp::max(config.idle_time as i64 - min_idle as i64, 0) as u64;
     IdleResponse {
-        // w_idle: tty,
-        // w_enabled: config.tty_input,
         xssstate_idle: xssstate,
         xssstate_enabled: config.x11_input,
         xprintidle_idle: xprintidle,
@@ -1003,10 +1001,6 @@ fn main() {
 
     if !config.tty_input && !config.x11_input {
         println!("tty_input or x11_input must be enabled.  Exiting.");
-        std::process::exit(1);
-    }
-    if config.tty_input && !command_exists("stat") {
-        println!("'stat' command required by tty_input failed.  Exiting.");
         std::process::exit(1);
     }
     if config.x11_input &&
