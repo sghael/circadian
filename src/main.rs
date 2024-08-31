@@ -20,38 +20,33 @@
  * You should have received a copy of the GNU General Public License
  * along with Circadian.  If not, see <http://www.gnu.org/licenses/>.
  */
-extern crate regex;
 
-use std::collections::HashSet;
-// use std::io::BufRead;
-use std::os::linux::fs::MetadataExt;
-// use regex::Regex;
-
-extern crate glob;
-use glob::glob;
-
+ // External crates
 extern crate clap;
-use clap::Parser;
-
+extern crate glob;
 extern crate ini;
-use ini::Ini;
-
 extern crate nix;
-use nix::sys::signal;
-
+extern crate regex;
 extern crate time;
-use time::macros::*;
-
 extern crate users;
-use users::get_user_by_name;
 
+// Standard library imports
+use std::collections::HashSet;
+use std::fmt::Debug;
 use std::io::Write;
+use std::os::linux::fs::MetadataExt;
+use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
-use std::process::Stdio;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use std::os::unix::process::CommandExt;
+// Crate-specific imports
+use clap::Parser;
+use glob::glob;
+use ini::Ini;
+use nix::sys::signal;
+use time::macros::*;
+use users::get_user_by_name;
 
 pub static VERBOSITY: AtomicUsize = AtomicUsize::new(0);
 pub const MAX_VERBOSITY: usize = 4;
