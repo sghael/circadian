@@ -137,6 +137,11 @@ impl From<nix::Error> for CircadianError {
         CircadianError(error.to_string().to_owned())
     }
 }
+impl From<std::time::SystemTimeError> for CircadianError {
+    fn from(error: std::time::SystemTimeError) -> Self {
+        CircadianError(error.to_string().to_owned())
+    }
+}
 impl From<time::error::Parse> for CircadianError {
     fn from(error: time::error::Parse) -> Self {
         CircadianError(error.to_string().to_owned())
