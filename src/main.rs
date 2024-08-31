@@ -47,6 +47,7 @@ use ini::Ini;
 use nix::sys::signal;
 use time::macros::*;
 use users::get_user_by_name;
+use std::fs;
 
 pub static VERBOSITY: AtomicUsize = AtomicUsize::new(0);
 pub const MAX_VERBOSITY: usize = 4;
@@ -405,8 +406,32 @@ fn xauthority_for_uid(uid: u32, display: &str) -> String {
     }
 }
 
-/// Use 'stat' command to return minimum idle time across all /dev/tty* files
-fn idle_w() -> IdleResult {
+fn idle_tty() -> IdleResult {
+    // Determines the minimum idle time across all active TTY devices.
+    //
+    // This function iterates through all entries in the "/dev" directory, checking for devices that
+    // start with "tty". It computes the idle time for each device by subtracting the last access
+    // time of the device from the current system time. The minimum idle time across all checked
+    // TTY devices is then returned.
+    //
+    // Returns:
+    // - `Ok(u32)` containing the minimum idle time (in seconds) if at least one TTY device is found.
+    // - `Err(CircadianError)` if no TTY devices are found or if there's an error while accessing any of the devices.
+    //
+    // # Errors
+    // This function will return an error if:
+    // - The "/dev" directory cannot be read.
+    // - Metadata of any device cannot be accessed.
+    // - The last accessed time of any device cannot be determined.
+    //
+    // # Example
+    // 
+    // ```
+    // match idle_tty() {
+    //     Ok(idle_time) => println!("Minimum idle time: {} seconds", idle_time),
+    //     Err(e) => eprintln!("Error: {}", e),
+    // }
+    // ```
     let mut min_idle_time = std::u32::MAX;
     let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as u32;
 
@@ -429,11 +454,6 @@ fn idle_w() -> IdleResult {
         Ok(min_idle_time)
     }
 }
-
-
-// use std::collections::HashSet;
-use std::fs;
-// use std::process::{Command, Stdio};
 
 fn idle_fn(cmd: &str, args: Vec<&str>) -> IdleResult {
     let mut display_mins: Vec<u32> = Vec::new();
@@ -747,7 +767,7 @@ fn read_config(file_path: &str) -> Result<CircadianConfig, CircadianError> {
 
 fn test_idle(config: &CircadianConfig, start: i64) -> IdleResponse {
     let now = time::OffsetDateTime::now_utc().unix_timestamp();
-    let tty = idle_w();
+    let tty = idle_tty();
     let xssstate = idle_xssstate();
     let xprintidle = idle_xprintidle();
     let tty_idle = *tty.as_ref().unwrap_or(&std::u32::MAX);
@@ -921,10 +941,7 @@ fn reschedule_auto_wake(auto_wake: Option<&String>, current_epoch: Option<AutoWa
 
 #[allow(dead_code)]
 fn test() {
-    // println!("Sec: {:?}", parse_w_time("10.45s"));
-    // println!("Sec: {:?}", parse_w_time("1:11"));
-    // println!("Sec: {:?}", parse_w_time("0:10m"));
-    println!("w min: {:?}", idle_w());
+    println!("tty min: {:?}", idle_tty());
     println!("xssstate min: {:?}", idle_xssstate());
     println!("xprintidle min: {:?}", idle_xprintidle());
     println!("cpu: {:?}", thresh_cpu(CpuHistory::Min5, 0.3, std::cmp::PartialOrd::lt));
