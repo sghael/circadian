@@ -23,9 +23,9 @@
 extern crate regex;
 
 use std::collections::HashSet;
-use std::io::BufRead;
+// use std::io::BufRead;
 use std::os::linux::fs::MetadataExt;
-use regex::Regex;
+// use regex::Regex;
 
 extern crate glob;
 use glob::glob;
@@ -435,84 +435,28 @@ fn idle_w() -> IdleResult {
     }
 }
 
-/// Call idle command for each X display
-///
-/// 'cmd' should be a unix command that, given args 'args', prints the idle
-/// time in milliseconds.  It will be run with the DISPLAY env variable set
-/// and with the uid of the user that owns the DISPLAY, for every running
-/// X display.  The minimum of all found idle times is returned.
+
+// use std::collections::HashSet;
+use std::fs;
+// use std::process::{Command, Stdio};
+
 fn idle_fn(cmd: &str, args: Vec<&str>) -> IdleResult {
-    let mut display_mins: Vec<u32> = Vec::<u32>::new();
-    let (w_args, from_idx) = w_from_args()?;
-    println_vb4!("cmd: {} / w args: '{}' / w field: {}", cmd, w_args, from_idx);
+    let mut display_mins: Vec<u32> = Vec::new();
+    
     for device in glob("/tmp/.X11-unix/X*")? {
-        println_vb4!("  - socket: {:?}", device);
-        let device: String = match device {
+        let device = match device {
             Ok(p) => p.to_str().unwrap_or("0").to_owned(),
-            _ => "0".to_owned(),
+            Err(_) => "0".to_owned(),
         };
         let display = format!(":{}", device.chars().rev().next().unwrap_or('0'));
-        println_vb4!("    - display: {}", display);
-        let mut output = Command::new("w")
-            .arg(&w_args)
-            .stdout(Stdio::piped()).spawn()?;
-        let _ = output.wait()?;
-        let w_stdout = output.stdout
-            .ok_or(CircadianError("w command has no output".into()))?;
-        let awk_arg = format!("{{if (${} ~ /^{}/) print $1}}", from_idx + 1, display);
-        let output = Command::new("awk")
-            .arg(awk_arg)
-            .stdin(w_stdout)
-            .output()?;
-        let user_str = String::from_utf8(output.stdout)
-            .unwrap_or(String::new());
-        println_vb4!("    - awk users ({}): {}", user_str.len(), user_str.replace("\n", " / "));
-
-        // Get a list of all system users with open sessions to this
-        // X11 display, and de-duplicate by storing in a set.  There
-        // should be one per logged in user if a session manager is in
-        // use, plus one for each terminal the user has open.
-        let user_list: HashSet<&str> = user_str.split("\n")
-            .map(|x| x.trim())
-            .filter(|x| x.len() > 0)
-            .collect();
-        // Convert all of the user names to UIDs.
-        let mut user_list: HashSet<u32> = user_list.iter()
-            .filter_map(|x| match x.trim() {
-                user if user.len() > 0 => {
-                    match Command::new("id").arg("-u").arg(user).output() {
-                        Ok(output) => {
-                            let mut uid = String::from_utf8(output.stdout)
-                                .unwrap_or(String::new());
-                            uid.pop();
-                            let uid = uid.parse::<u32>().unwrap_or(0);
-                            Some(uid)
-                        },
-                        Err(_) => {
-                            None
-                        }
-                    }
-                },
-                _ => {
-                    None
-                }
-            })
-            .collect();
-        // Insert the UID of the socket owner, too.  This covers X
-        // servers spawned without session managers, i.e. those
-        // spawned with 'startx' or Xephyr.
-        let owner_uid = std::fs::metadata(&device)?.st_uid();
+        
+        let owner_uid = fs::metadata(&device)?.st_uid();
+        let mut user_list: HashSet<u32> = HashSet::new();
         user_list.insert(owner_uid);
-        // Always give it a try as root, too, since root can read
-        // xauth files from anywhere.
-        user_list.insert(0);
-        println_vb4!("    - socket owner: {}", owner_uid);
+        user_list.insert(0); // Add root UID
+        
         for uid in user_list {
-            println_vb4!("    - UID: {}", uid);
             let xauth = xauthority_for_uid(uid, &display);
-            println_vb4!("    - xauthority: {}", xauth);
-            // allow this command to fail, in case there are several X
-            // servers running.
             match Command::new(cmd)
                 .args(&args)
                 .uid(uid)
@@ -520,24 +464,32 @@ fn idle_fn(cmd: &str, args: Vec<&str>) -> IdleResult {
                 .env("XAUTHORITY", &xauth)
                 .output() {
                     Ok(output) => {
-                        let mut idle_str = String::from_utf8(output.stdout)
-                            .unwrap_or(String::new());
-                        idle_str.pop();
-                        let idle = idle_str.parse::<u32>().unwrap_or(std::u32::MAX)/1000;
-                        println_vb4!("      - idle: {}", idle);
-                        display_mins.push(idle);
+                        let idle_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        if let Ok(idle) = idle_str.parse::<u32>() {
+                            let idle = idle / 1000;
+                            display_mins.push(idle);
+                        }
                     },
                     Err(e) => {
-                        println!("WARNING: {} failed for socket {} with error: {}", cmd, device, e);
+                        eprintln!("WARNING: {} failed for socket {} with error: {}", cmd, device, e);
                     },
                 }
         }
     }
-    match display_mins.len() {
-        0 => Err(CircadianError("No displays found.".to_string())),
-        _ => Ok(display_mins.iter().fold(std::u32::MAX, |acc, x| std::cmp::min(acc,*x)))
+    
+    if display_mins.is_empty() {
+        Err(CircadianError("No displays found.".to_string()))
+    } else {
+        Ok(*display_mins.iter().min().unwrap_or(&std::u32::MAX))
     }
 }
+
+// You need to implement or provide the following components for the code to be fully functional:
+// - `glob` function to match the `"/tmp/.X11-unix/X*"` pattern.
+// - `CircadianError` struct or type definition.
+// - `xauthority_for_uid` function which returns the xauthority path for a given user ID and display.
+// - Ensure that the `Command::new(cmd).uid(uid)` part works correctly on your system configuration.
+
 
 /// Call 'xprintidle' command and return idle time
 fn idle_xprintidle() -> IdleResult {
@@ -974,9 +926,9 @@ fn reschedule_auto_wake(auto_wake: Option<&String>, current_epoch: Option<AutoWa
 
 #[allow(dead_code)]
 fn test() {
-    println!("Sec: {:?}", parse_w_time("10.45s"));
-    println!("Sec: {:?}", parse_w_time("1:11"));
-    println!("Sec: {:?}", parse_w_time("0:10m"));
+    // println!("Sec: {:?}", parse_w_time("10.45s"));
+    // println!("Sec: {:?}", parse_w_time("1:11"));
+    // println!("Sec: {:?}", parse_w_time("0:10m"));
     println!("w min: {:?}", idle_w());
     println!("xssstate min: {:?}", idle_xssstate());
     println!("xprintidle min: {:?}", idle_xprintidle());
