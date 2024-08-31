@@ -510,29 +510,29 @@ fn xauthority_for_uid(uid: u32, display: &str) -> String {
     }
 }
 
-/// Call 'w' command and return minimum idle time
+/// Use 'stat' command to return minimum idle time across all /dev/tty* files
 fn idle_w() -> IdleResult {
-    let num_fields = count_w_fields()?;
-    let w_stdout = Stdio::piped();
-    let mut w_output = Command::new("w")
-        .arg("-hus")
-        .stdout(w_stdout).spawn()?;
-    let _ = w_output.wait()?;
-    let w_stdout = w_output.stdout
-        .ok_or(CircadianError("w command has no output".into()))?;
-    // idle field is the second to last
-    let awk_output = Command::new("awk")
-        .arg(format!("{{print ${}}}", num_fields - 1))
-        .stdin(w_stdout)
-        .output()?;
-    let idle_times: Vec<u32> = String::from_utf8(awk_output.stdout)
-        .unwrap_or(String::new())
-        .split("\n")
-        .filter(|t| t.len() > 0)
-        .map(|t| parse_w_time(t))
-        .filter_map(|t| t.ok())
-        .collect();
-    Ok(idle_times.iter().cloned().fold(std::u32::MAX, std::cmp::min))
+    let mut min_idle_time = std::u32::MAX;
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_secs() as u32;
+
+    for entry in std::fs::read_dir("/dev")? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.to_str().unwrap_or("").starts_with("/dev/tty") {
+            let metadata = std::fs::metadata(&path)?;
+            let access_time = metadata.accessed()?.duration_since(std::time::UNIX_EPOCH)?.as_secs() as u32;
+            let idle_time = now - access_time;
+            if idle_time < min_idle_time {
+                min_idle_time = idle_time;
+            }
+        }
+    }
+
+    if min_idle_time == std::u32::MAX {
+        Err(CircadianError("No TTY devices found.".to_string()))
+    } else {
+        Ok(min_idle_time)
+    }
 }
 
 /// Call idle command for each X display
