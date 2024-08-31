@@ -1020,8 +1020,8 @@ fn main() {
         println!("tty_input or x11_input must be enabled.  Exiting.");
         std::process::exit(1);
     }
-    if config.tty_input && !command_exists("w") {
-        println!("'w' command required by tty_input failed.  Exiting.");
+    if config.tty_input && !command_exists("stat") {
+        println!("'stat' command required by tty_input failed.  Exiting.");
         std::process::exit(1);
     }
     if config.x11_input &&
