@@ -175,8 +175,6 @@ struct AutoWakeEpoch {
 
 #[derive(Debug)]
 struct IdleResponse {
-    w_idle: IdleResult,
-    w_enabled: bool,
     xssstate_idle: IdleResult,
     xssstate_enabled: bool,
     xprintidle_idle: IdleResult,
@@ -194,7 +192,6 @@ struct IdleResponse {
 impl std::fmt::Display for IdleResponse {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let result_map = vec![
-            (self.w_idle.as_ref(), self.w_enabled, "w"),
             (self.xssstate_idle.as_ref(), self.xssstate_enabled, "xssstate"),
             (self.xprintidle_idle.as_ref(), self.xprintidle_enabled, "xprintidle"),
         ];
@@ -301,9 +298,6 @@ fn command_exists(cmd: &str) -> bool {
             Err(_) => false,
         }
 }
-
-
-
 
 fn xauthority_from_cmdline(display: &str) -> Result<String, CircadianError> {
     // Look for PIDs of processes with a variety of X11-related names.
@@ -455,7 +449,34 @@ fn idle_tty() -> IdleResult {
     }
 }
 
-fn idle_fn(cmd: &str, args: Vec<&str>) -> IdleResult {
+fn idle_display(cmd: &str, args: Vec<&str>) -> IdleResult {
+    // Executes a given command to determine the idle time for each active X11 display.
+    //
+    // This function searches for X11 display sockets in the /tmp/.X11-unix/ directory and
+    // executes a provided command (e.g., xprintidle, xssstate) to determine the idle time
+    // for each display. It handles multiple users by switching user contexts to both the
+    // display's owner and the root user. The lowest idle time across all displays is returned.
+    //
+    // # Arguments
+    // * `cmd` - A string slice that holds the name of the command to execute (e.g., "xprintidle").
+    // * `args` - A vector of string slices containing arguments to pass to the command.
+    //
+    // # Returns
+    // * `IdleResult` - Ok(u32) containing the minimum idle time (in seconds) across all displays,
+    //                  or an Err(CircadianError) if no displays are found.
+    //
+    // # Errors
+    // This function may return a `CircadianError` if:
+    // * There is an error while reading the X11 display sockets or their metadata.
+    // * There is an issue executing the provided command for any of the detected displays.
+    //
+    // # Example
+    // ```
+    // match idle_display("xprintidle", vec![]) {
+    //     Ok(idle_time) => println!("Minimum idle time across displays: {} seconds", idle_time),
+    //     Err(e) => eprintln!("Error: {}", e),
+    // }
+    // ```
     let mut display_mins: Vec<u32> = Vec::new();
     
     for device in glob("/tmp/.X11-unix/X*")? {
@@ -508,12 +529,12 @@ fn idle_fn(cmd: &str, args: Vec<&str>) -> IdleResult {
 
 /// Call 'xprintidle' command and return idle time
 fn idle_xprintidle() -> IdleResult {
-    idle_fn("xprintidle", vec![])
+    idle_display("xprintidle", vec![])
 }
 
 /// Call 'xssstate' command and return idle time
 fn idle_xssstate() -> IdleResult {
-    idle_fn("xssstate", vec!["-i"])
+    idle_display("xssstate", vec!["-i"])
 }
 
 
@@ -782,8 +803,8 @@ fn test_idle(config: &CircadianConfig, start: i64) -> IdleResponse {
     let idle_remain: u64 =
             std::cmp::max(config.idle_time as i64 - min_idle as i64, 0) as u64;
     IdleResponse {
-        w_idle: tty,
-        w_enabled: config.tty_input,
+        // w_idle: tty,
+        // w_enabled: config.tty_input,
         xssstate_idle: xssstate,
         xssstate_enabled: config.x11_input,
         xprintidle_idle: xprintidle,
