@@ -343,41 +343,6 @@ fn parse_w_time(time_str: &str) -> Result<u32, CircadianError> {
 }
 
 
-// Returns tuple containing argument string to provide to `w` to have
-// the FROM field included, and the 0-indexed offset of the field.
-fn w_from_args() -> Result<(String, usize), CircadianError> {
-    // Ask for a fake user to get just the header and check if the
-    // FROM field is enabled.
-    let w_output = Command::new("w")
-        .arg("-us")
-        .arg("CIRCADIAN_FAKEUSER")
-        .output()?;
-    let w_fields: Vec<String> = w_output.stdout
-        .lines()
-        .nth(1) // second line is the header
-        .ok_or(CircadianError("w command has no output".into()))??
-        .split_whitespace().map(|x| x.to_owned()).collect();
-    let from_header = String::from("FROM");
-    let (hargs, args) = match w_fields.contains(&from_header) {
-        true => ("-hus".to_string(), "-us".to_string()),
-        false => ("-husf".to_string(), "-usf".to_string()),
-    };
-
-    // Do it again with FROM field on and find its index.
-    let w_output = Command::new("w")
-        .arg(&args)
-        .arg("CIRCADIAN_FAKEUSER")
-        .output()?;
-    let w_fields: Vec<String> = w_output.stdout
-        .lines()
-        .nth(1)
-        .ok_or(CircadianError("w command has no output".into()))??
-        .split_whitespace().map(|x| x.to_owned()).collect();
-    let idx = w_fields.iter()
-        .position(|x| x == &from_header)
-        .ok_or(CircadianError("w command arguments invalid".into()))?;
-    Ok((hargs, idx))
-}
 
 fn xauthority_from_cmdline(display: &str) -> Result<String, CircadianError> {
     // Look for PIDs of processes with a variety of X11-related names.
